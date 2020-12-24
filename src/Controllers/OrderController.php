@@ -1,233 +1,330 @@
 <?php
 
-namespace App\Admin\Controllers;
+namespace Ejoy\Shop\Controllers;
 
-use App\Admin\Extensions\Actions\OrderStatusCancelAction;
-use App\Admin\Extensions\Actions\OrderStatusRefundAction;
-use App\Admin\Extensions\Actions\OrderStatusReturnAction;
-use App\Admin\Extensions\Actions\OrderStatusSendAction;
-use App\Admin\Extensions\Exporter\OrderExcelDemo;
-use App\Admin\Extensions\Exporter\OrderExcelExporter;
-use App\Admin\Extensions\Exporter\OrderExport;
-use App\Admin\Extensions\Filter\CustomBetween;
-use App\Admin\Extensions\Importer\OrderImport;
-use App\Admin\Extensions\Tools\ExpressExporter;
-use App\Facades\Logger;
-use App\Models\Order;
-use App\Http\Controllers\Controller;
-use App\Models\RobinFiles;
-use Encore\Admin\Controllers\ModelForm;
-use Encore\Admin\Form;
-use Encore\Admin\Grid;
-use Encore\Admin\Facades\Admin;
-use Encore\Admin\Layout\Content;
-use function foo\func;
-use Illuminate\Http\File;
+use App\Facades\Log;
+use Ejoy\Shop\Models\Express;
+use App\Models\FormCollection;
+use App\Models\AdminMini;
+use Ejoy\Shop\Models\Order;
+use Ejoy\Shop\Models\OrderProduct;
+use Ejoy\Shop\Models\Product;
+use App\Models\WechatTemplate;
+use EasyWeChat\Factory;
+use EasyWeChat\Kernel\Support\XML;
 use Illuminate\Http\Request;
-use Excel;
+use App\Http\Controllers\Controller;
+use Validator;
+use Illuminate\Support\Facades\DB;
 class OrderController extends Controller
 {
-    use ModelForm;
+    public function test(){
 
-    /**
-     * Index interface.
-     *
-     * @return Content
-     */
-    public function index()
-    {
-        return Admin::content(function (Content $content) {
-
-            $content->header('列表');
-            $content->description('订单');
-
-            $content->body($this->grid());
-        });
+        $templateId='N9nETkM9V6jOFVxyGOz8QnIZy98dt4SY-Crr-1hrib0';
+        $data=[
+            'wechat_name'=>'Robin',
+            'keyword1'=>'12321313232321',
+            'keyword2'=>'西来抱枕*1',
+            'keyword3'=>12.3,
+            'keyword4'=>'已支付',
+            'keyword5'=>'罗彬',
+        ];
+        $return=WechatTemplate::sendTemplateMsg($templateId,'oaVMQ0Q8vF_9jW7UySf6gftnI7uk',$data);
     }
-
-
     /**
-     * Edit interface.
-     *
-     * @param $id
-     * @return Content
+     * @param Request $request
+     * 计算商品价格
      */
-    public function edit($id)
-    {
-        return Admin::content(function (Content $content) use ($id) {
-
-            $content->header('编辑');
-            $content->description('订单');
-
-            $content->body($this->form($id)->edit($id));
-        });
-    }
-    public function destroy($id)
-    {
-        Order::where('id',$id)->update(['status'=>0]);
-        return response()->json([
-            'status'  => true,
-            'message' => trans('admin.delete_succeeded'),
+    public function calculate(Request $request){
+        $validator = Validator::make($request->all(), [
+            'attr'=>'required|array',
         ]);
-    }
-
-
-    /**
-     * Create interface.
-     *
-     * @return Content
-     */
-    public function create()
-    {
-        return Admin::content(function (Content $content) {
-
-            $content->header('创建');
-            $content->description('订单');
-
-            $content->body($this->form());
-        });
-    }
-    /**
-     * Make a grid builder.
-     *
-     * @return Grid
-     */
-    protected function grid()
-    {
-        return Admin::grid(Order::class, function (Grid $grid) {
-            if(!Admin::user()->isAdministrator()){
-                $grid->model()->where('channel',Admin::user()->channel);
-            }
-            $grid->exporter(new OrderExcelExporter);
-            $grid->disableCreateButton();
-            $grid->model()->orderByDesc('order_no');
-            $grid->tools(function($tools){
-                $url=url('order/import',request()->all());
-                $tools->append("<a href='$url'  class='btn btn-sm btn-twitter pull-right' style='margin-right:10px;background-color:#1e94af;'><i class='fa fa-upload'></i>批量发货</a>");
-            });
-
-            $grid->filter(function(Grid\Filter $filter) {
-                $filter->disableIdFilter();
-                $filter->equal('order_sn', '订单编号');
-                $filter->equal('user.openid', 'OPENID');
-                $filter->like('user.nickname', '用户名');
-                $filter->between('total_price','订单金额');
-                $filter->use(new CustomBetween('order','created_at','创建时间'))->datetime();
-                $filter->in('status','状态')->checkbox(Order::$statusArr);
-            });
-
-            $grid->actions(function(Grid\Displayers\Actions $actions){
-                $actions->disableView();
-                switch ($actions->row->status){
-                    case ORDER_COMMITED:
-                        $actions->add(new OrderStatusCancelAction);break;
-                    case ORDER_PAIED:
-                        $actions->add(new OrderStatusRefundAction);
-                        $actions->add(new OrderStatusSendAction);break;
-                    case ORDER_RETURNED:
-                        $actions->add(new OrderStatusRefundAction);break;
-                    case ORDER_SENDED:
-                        $actions->add(new OrderStatusReturnAction);break;
-                }
-            });
-            $grid->column('id','订单ID')->sortable();
-            if(Admin::user()->isAdministrator()){
-                $grid->column('channel','渠道标识');
-            }
-            $grid->column('order_sn','订单编号');
-            $grid->column('user.nickname','用户名');
-            $grid->column('content','购买内容');
-            $grid->column('total_price','订单金额')->filter('range')->totalRow(function ($amount) {
-                return "<span class='text-danger text-bold'>合计：<i class='fa fa-yen'></i> {$amount}</span>";
-            });
-//            $grid->column('transaction_id','支付流水号');
-            $grid->column('created_at','创建时间');
-            $grid->column('status','状态')->filter(Order::$statusArr)->using(Order::$statusArr);
-        });
-    }
-
-    /**
-     * Make a form builder.
-     *
-     * @return Form
-     */
-    protected function form($id=null)
-    {
-        return Admin::form(Order::class, function (Form $form) use ($id) {
-            $orderInfo=Order::with('product_list')->find($id);
-            $form->display('id', '订单ID');
-            $form->display('order_sn','订单编号');
-            $form->display('user.nickname','用户名');
-            $form->display('member_id','会员编号');
-            $form->display('total_price','订单金额');
-            $form->display('transaction_id','支付流水');
-            $form->display('out_trade_no','商户订单号');
-            $form->display('pay_time','支付时间');
-            $form->display('created_at', '创建时间');
-            $form->display('updated_at', '更新时间');
-            $form->select('status', '状态')->options(Order::$statusArr)->readOnly();
-            $form->html(function() use ($orderInfo){
-                return view('admin.form.order.order_product_list',['products'=>$orderInfo->product_list]);
-            },'订单商品');
-            $form->divider('发票信息');
-            $form->display('invoice_title', '抬头');
-            $form->display('invoice_tax_number', '税号');
-            $form->display('invoice_bank_name', '开户行');
-            $form->display('invoice_bank_account', '账号');
-            $form->display('invoice_tel', '企业电话');
-            $form->display('invoice_company_address', '开票地址');
-            $form->text('invoice_no', '发票号');
-            $form->date('invoice_date', '开票日期');
-            $form->divider('地址信息');
-            $form->text('address_name','收货人')->rules('required');
-            $form->text('address_mobile','手机')->rules('required');
-            $form->text('address_province_name','省');
-            $form->text('address_city_name','市');
-            $form->text('address_district_name','区');
-            $form->text('address_street', '详细地址')->rules('required');
-            $form->display('receive_time', '收货时间');
-
-            $form->divider('物流信息');
-            $form->text('express_company','快递公司');
-            $form->text('express_company_code','快递公司编号');
-            $form->text('express_no','快递单号');
-            $form->textarea('comment','备注');
-            $form->display('send_time','发货时间');
-        });
-    }
-    public function update($id)
-    {
-
-        $status=request()->get('status');
-
-        return $this->form($id)->update($id);
-    }
-
-
-
-
-    public function import(Request $request ){
-        $sheetDataArr=[];
-        if($request->hasFile('excel_file')){
-            $fileInfo=$request->file('excel_file');
-            Excel::import(new OrderImport,$fileInfo);
-            return  redirect('/admin/order');
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
         }
-        $form=Admin::form(RobinFiles::class, function (Form $form)  use($sheetDataArr){
-            $form->setAction('/admin/order/import');
-            $form->file('excel_file', '订单Excel')->setWidth(3)->rules('required|mimes:xlsx')->help("导出的订单数据，填充完 物流公司【V】和 物流单号【W】之后再导入以进行批量发货操作");
-        });
-        return Admin::content(function (Content $content) use ($form) {
-            $content->header('订单');
-            $content->description('批量发货');
-            $content->body($form);
+        $result=Order::calculateOrder($request->attr,$request->user_coupon_id);
+        unset($result['order']);
+
+        response_json($result);
+    }
+
+    /**
+     * @param Request $request
+     * 提交订单
+     */
+    public function commit(Request $request){
+        $validator = Validator::make($request->all(), [
+            'attr'=>'required_without:order_id|array',
+            'wechat_address_json'=>'required_without:order_id',
+            'total_price'=>'required_without:order_id',
+            'order_id'=>'integer',
+//            'comment'=>'string'
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderComment=$request->get('comment','');
+        $channel=$request->get('channel','mini');
+        $miniConfig=AdminMini::query()->where('channel',$channel)->first()->toArray();
+        if(empty($miniConfig))
+            response_json(null,'CHANNEL_ERROR');
+        $productIdArr=$request->get('attr',[]);
+
+        $address=json_decode($request->wechat_address_json,JSON_UNESCAPED_UNICODE);
+        if(empty($address))
+            response_json(null,'ADDRESSNOTFOUND');
+        if(!empty($request->order_id)){//若支付已存在的订单
+            $orderModel=Order::where('status',ORDER_COMMITED)->find($request->order_id);
+            if(empty($orderModel->id))
+                response_json(null,'ORDERNOTFOUND');
+        }else{//否则创建订单
+            $result=Order::calculateOrder($productIdArr,$request->user_coupon_id);
+            Log::info('订单金额比对：',[floatval($result['total_price']),floatval($request->total_price)]);
+            if(bccomp(floatval($result['total_price']), floatval($request->total_price),2)!=0)
+                response_json(null,'ORDERPRICEERROR');
+            $orderModel=new Order();
+            $orderContent=!empty($result['order']['content'])?implode(",",$result['order']['content']):"";
+            $orderModel->fill([
+                'openid'=>$request->openid,'member_id'=>$GLOBALS['userInfo']['userInfo']['member_id'],'order_sn'=>generateUniqueStr('OTN'),
+                'address_name'=>$address['userName'],'address_mobile'=>$address['telNumber'],'address_street'=>$address['detailInfo'],'channel'=>$channel,
+                'address_province_name'=>$address['provinceName'],'address_city_name'=>$address['cityName'],'address_district_name'=>$address['countyName'],
+                'content'=>$orderContent,'total_price'=>$result['total_price'],'wechat_address_json'=>$request->wechat_address_json,'wechat_invoice_json'=>$request->wechat_invoice_json
+            ]);
+            if(!empty($request->wechat_invoice_json)){//发票信息
+                $invoice=json_decode($request->wechat_invoice_json,JSON_UNESCAPED_UNICODE);
+                $orderModel->invoice_title=$invoice['title'];
+                $orderModel->invoice_tax_number=$invoice['taxNumber'];
+                $orderModel->invoice_bank_name=$invoice['bankName'];
+                $orderModel->invoice_bank_account=$invoice['bankAccount'];
+                $orderModel->invoice_tel=$invoice['telephone'];
+                $orderModel->invoice_company_address=$invoice['companyAddress'];
+            }
+            //{"bankAccount":"120909282210301","bankName":"招商银行股份有限公司广州市体育东路支行","companyAddress":"广州市海珠区新港中路397号自编72号(商业街F5-1)","errMsg":"chooseInvoiceTitle:ok","taxNumber":"91440101327598294H","telephone":"020-81167888","title":"广州腾讯科技有限公司","type":"0"}
+
+
+        }
+        $orderModel->comment=!empty($request->comment)?$orderModel->comment."\n".$request->comment:$orderModel->comment;
+        //------------------------------微信支付：统一下单&支付参数签名--------------------
+        $wechatPayApp=Factory::payment($miniConfig);
+        $unifyData=[
+            'openid'=>$request->openid,
+            'body'=>'艺崛科技',
+            'attach'=>PRODUCT_ORDER,
+            'out_trade_no'=>$orderModel->order_sn,
+            'total_fee'=>intval($orderModel->total_price*100),
+            'notify_url'=>url('api/order/notify'),
+            'trade_type'=>'JSAPI'
+        ];
+        $return=$wechatPayApp->order->unify($unifyData);//统一下单
+        // return=( [return_code] => SUCCESS [return_msg] => OK [appid] => wx6bc6a5c73e979ffd [mch_id] => 1401801902 [nonce_str] => N3qWWipL3jqV4Rj2 [sign] => 5773EF09149A877FF715E0B364C0CB67 [result_code] => SUCCESS [prepay_id] => wx21171004238680edbdbfee041826545000 [trade_type] => JSAPI )
+        if(empty($return['prepay_id'])){
+            Log::error('统一下单接口数据异常：',$return,'wechat_pay');
+            response_json($return,'FAIL','提交订单-失败');
+        }
+        $orderModel->prepay_id=$return['prepay_id'];
+        for($i=0;$i<3;$i++){
+            FormCollection::saveFormId($return['prepay_id']);
+        }
+        $signData=$wechatPayApp->jssdk->bridgeConfig($return['prepay_id'],false);//支付参数签名
+        if(empty($signData['package'])){
+            Log::error('支付参数-签名错误：',$return,'wechat_pay');
+            response_json($return,'FAIL','支付参数-签名失败');
+        }
+        //---------------------------------微信支付：结束----------------------------
+        DB::beginTransaction();
+        $flag=true;
+        $flag=$flag && $orderModel->save();
+
+        //---------------------------------清除购物车指定的商品---------------------------------
+        if(empty($request->order_id)){//若是提交新订单，则修改购物车和库存数量
+            Product::updateCartAndStorage($GLOBALS['userInfo']['userInfo']['member_id'],$productIdArr);
+            foreach($result['order']['product'] as &$product){
+                $product['order_id']=$orderModel->id;
+            }
+            $flag=$flag && OrderProduct::insert($result['order']['product']);
+        }
+        if($flag){
+            DB::commit();
+
+            response_json(['orderInfo'=>$orderModel->toArray(),'payInfo'=>$signData]);
+        }else{
+            DB::rollback();
+            response_json(null,'FAIL','订单提交失败');
+        }
+    }
+
+    /**
+     * @param Request $request
+     * 支付回调
+     */
+    public function notify(Request $request){
+        $message = XML::parse(strval($request->getContent()));
+        Log::info('微信支付回调数据：',[$message],'wechat_pay');
+        $miniConfig=AdminMini::query()->where('app_id',$message['appid'])->first()->toArray();
+        $wechatPayApp=Factory::payment($miniConfig);
+        return $wechatPayApp->handlePaidNotify(function($streamData,$fail){
+            $errorMsg='';
+            if(empty($streamData['attach']))
+                Log::info("===========未检测到attach字段（自定义订单类型）", [], 'wechat_pay');
+            if($streamData['attach']=="1"){
+                $orderInfo=Order::where('order_sn',$streamData['out_trade_no'])->where('status',ORDER_COMMITED)->first();
+            }else if($streamData['attach']=="2"){
+                $orderInfo=ActivityOrder::where('order_sn',$streamData['out_trade_no'])->where('status',ORDER_COMMITED)->first();
+            }else{
+                $errorMsg="未知的订单类型【1-商城订单，2-活动订单】";
+            }
+            if(empty($orderInfo))
+                $errorMsg="未找到订单-".$streamData['out_trade_no'];
+            if($orderInfo->total_price*100!=$streamData['total_fee'])  //匹配订单金额与  微信支付交易金额是否相等
+                $errorMsg="订单金额有误";
+            Log::info("===========$errorMsg", [$orderInfo], 'wechat_pay');
+            $orderInfo->updateOrder($streamData,$errorMsg);
+            return true;
         });
     }
 
-    public function download_express_demo()
+    /**
+     * @param Request $request
+     * 订单列表
+     */
+    public function orderList(Request $request)
     {
-        return (new OrderExcelDemo())->download('订单导入模板.xlsx');
-
+        $validator = Validator::make($request->all(), [
+            'status'=>'integer'
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderQuery=Order::with('product_list')->where('member_id',$GLOBALS['userInfo']['userInfo']['member_id']);
+        if(!empty($request->status))
+            $orderQuery->where('status',$request->status);
+        $allOrder=$orderQuery->orderByDesc('id')->get(['id','total_price','order_sn','status','created_at','wechat_address_json'])->toArray();
+        foreach($allOrder as &$v){
+            foreach($v['product_list'] as $k=>&$product){
+                $product['price_comment']=$product['product_price']."元";
+                Product::formatProductDetail($product);
+            }
+            $v['products']=$v['product_list'];//兼容小程序老版本
+            unset($v['product_list']);//兼容小程序老版本
+        }
+        response_json($allOrder);
     }
-}
+    public function orderStatistics(Request $request){
+        $orderList=Order::where('member_id',$GLOBALS['userInfo']['userInfo']['member_id'])->where('status','>',0)->get(['id','status']);
+        $return=['order_num'=>count($orderList),'commited_num'=>0,'paid_num'=>0,'sended_num'=>0];
+        foreach($orderList as $k=>$v){
+            if($v['status']==ORDER_COMMITED)
+                $return['commited_num']++;
+            if($v['status']==ORDER_PAIED)
+                $return['paid_num']++;
+            if($v['status']==ORDER_SENDED)
+                $return['sended_num']++;
+        }
+        response_json($return);
+    }
 
+    /**
+     * @param Request $request
+     * 订单详情
+     */
+    public function orderDetail(Request $request){
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer',//订单ID
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderInfo=Order::with('product_list')->where('member_id',$GLOBALS['userInfo']['userInfo']['member_id'])->where('id',$request->order_id)->first();
+        if(empty($orderInfo))
+            response_json(null,"ORDERNOTFOUND");
+        $orderInfo=$orderInfo->toArray();
+        foreach($orderInfo['product_list'] as &$product){
+            Product::formatProductDetail($product);
+        }
+        $orderInfo['products']=$orderInfo['product_list'];
+        unset($orderInfo['product_list']);
+        $orderInfo['total_price_comment']=$orderInfo['total_price']."元";
+        response_json($orderInfo);
+    }
+
+    /**
+     * @param Request $request
+     * 取消订单
+     */
+    public function cancelOrder(Request $request){
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer',//订单ID
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderInfo=Order::where('member_id',$GLOBALS['userInfo']['userInfo']['member_id'])->where('status',ORDER_COMMITED)->where('id',$request->order_id)->first();
+        if(empty($orderInfo))
+            response_json(null,'CANCELEONLYCOMMITED');
+        $flag=$orderInfo->update(['status'=>ORDER_CANCELED]);
+        $str=$flag?"SUCCESS":"FAIL";
+        response_json($orderInfo,$str);
+    }
+
+    /**
+     * @param Request $request
+     * 确认收货
+     */
+    public function confirmOrder(Request $request){
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer',//订单ID
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderInfo=Order::where('member_id',$GLOBALS['userInfo']['userInfo']['member_id'])->where('status',ORDER_SENDED)->where('id',$request->order_id)->first();
+        if(empty($orderInfo))
+            response_json(null,'ORDERHAVENTSEND');
+        $flag=$orderInfo->update(['status'=>ORDER_RECEIVED]);
+        $str=$flag?"SUCCESS":"FAIL";
+        response_json($orderInfo,$str);
+    }
+    public function expressInfo1(Request $request){//快递鸟物流信息查询
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer',//订单ID
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderInfo=Order::where('member_id',$GLOBALS['userInfo']['userInfo']['member_id'])->findOrFail($request->order_id);
+        if(empty($orderInfo->express_no)){
+            response_json(['Success'=>false,'message'=>'订单尚未派送，请耐心等待']);
+        }
+        $data=['OrderCode'=>$orderInfo->order_sn,'ShipperCode'=>$orderInfo->express_company_code,'LogisticCode'=>$orderInfo->express_no];
+        $return=Express::getExpressInfo($data);
+        Log::info('--物流信息--',[$return]);
+        exit_json(['code'=>2000,'data'=>json_decode($return),'express_company'=>$orderInfo->express_company]);
+    }
+    public function expressInfo(Request $request){//快递100物流接口查询
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer',//订单ID
+        ]);
+        if ($validator->fails()) {
+            response_json(null, 'VALIDATORERROR', $validator->errors()->first());
+        }
+        $orderInfo=Order::where('member_id',$GLOBALS['userInfo']['userInfo']['member_id'])->findOrFail($request->order_id);
+        if(empty($orderInfo->express_no)){
+            response_json(['Success'=>false,'message'=>'订单尚未派送，请耐心等待']);
+        }
+        $return=express_query($orderInfo->express_no);
+        if(!empty($return) && $return['message']=='ok'){
+            $return['code']=2000;
+            $return['express_company']=$orderInfo->express_company;
+            $return['order_sn']=$orderInfo->order_sn;
+            $return['address_name']=$orderInfo->address_name;
+            $return['address_mobile']=$orderInfo->address_mobile;
+            $return['address_street']=$orderInfo->address_province_name."-".$orderInfo->address_city_name."-".$orderInfo->address_district_name." ".$orderInfo->address_street;
+            $expressStatusArr=config('state.express_status');
+            $return['status_desc']=!empty($expressStatusArr[$return['state']])?$expressStatusArr[$return['state']]:"状态未知";
+            Log::info('--物流信息--',[$return]);
+            exit_json($return);
+        }
+        response_json(null,'NONEEXPRESSINFO');
+    }
+
+}

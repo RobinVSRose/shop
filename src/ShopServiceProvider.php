@@ -2,6 +2,7 @@
 
 namespace Ejoy\Shop;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class ShopServiceProvider extends ServiceProvider
@@ -27,7 +28,8 @@ class ShopServiceProvider extends ServiceProvider
         }
 
         $this->app->booted(function () {
-            Shop::routes(__DIR__.'/../routes/web.php');
+            Route::group([], __DIR__.'/../routes/web.php');
+//            Shop::routes(__DIR__.'/../routes/web.php');
         });
     }
 }

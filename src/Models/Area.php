@@ -6,7 +6,7 @@
  * Time: 18:27
  */
 
-namespace App\Models;
+namespace Ejoy\Shop\Models;
 
 
 use Illuminate\Database\Eloquent\Model;

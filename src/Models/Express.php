@@ -3,7 +3,7 @@
  * Created by robin@2019/8/28 19:06
  */
 
-namespace App\Models;
+namespace Ejoy\Shop\Models;
 
 
 class Express

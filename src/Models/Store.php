@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace Ejoy\Shop\Models;
 
 use Encore\Admin\Auth\Database\Administrator;
 use Encore\Admin\Traits\AdminBuilder;

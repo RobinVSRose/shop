@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Admin\Controllers;
+namespace Ejoy\Shop\Controllers\Admin;
 
-use App\Models\ProductCategory;
+use Ejoy\Shop\Models\ProductCategory;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Controllers\ModelForm;
 use Encore\Admin\Form;

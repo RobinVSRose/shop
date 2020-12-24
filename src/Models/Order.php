@@ -1,14 +1,13 @@
 <?php
 
-namespace App\Models;
+namespace Ejoy\Shop\Models;
 
 use App\Facades\Log;
 use App\Facades\Logger;
+use App\Models\User;
 use EasyWeChat\Factory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Input;
 
 class Order extends Model
 {

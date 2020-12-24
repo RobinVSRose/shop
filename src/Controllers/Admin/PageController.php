@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Admin\Controllers;
+namespace Ejoy\Shop\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Page;
-use App\Models\Product;
+use Ejoy\Shop\Models\Page;
+use Ejoy\Shop\Models\Product;
 use Encore\Admin\Controllers\HasResourceActions;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;

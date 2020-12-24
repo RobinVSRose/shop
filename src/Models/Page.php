@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Models;
+namespace Ejoy\Shop\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
-class Page extends AdminModel
+class Page extends Model
 {
     protected $table='page';
     public $timestamps=false;
