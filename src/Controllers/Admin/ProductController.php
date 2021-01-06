@@ -27,7 +27,7 @@ class ProductController extends Controller
         return Admin::content(function (Content $content) {
 
             $content->header('产品');
-            $content->description('列表');
+            $content->description('列表1');
 
             $content->body($this->grid());
         });
@@ -86,9 +86,9 @@ class ProductController extends Controller
             });
             $grid->model()->orderByDesc('id');
             $grid->id('ID')->sortable();
-            $grid->column('channel','渠道标识')->using($channelNameArr);
-            $grid->name('名称');
+            $grid->column('channel','渠道')->using($channelNameArr);
             $grid->column('category.name','分类名称');
+            $grid->name('商品名称');
             $grid->updated_at('更新时间');
             $grid->column('is_sale','是否上架')->switch(config('state.common.switch_flag'));
             $grid->column('actions','操作')->displayUsing(CustomActions::class);

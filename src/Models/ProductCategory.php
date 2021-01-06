@@ -5,8 +5,8 @@ namespace Ejoy\Shop\Models;
 use App\Admin\Extensions\CustomModelTree;
 use Encore\Admin\Traits\AdminBuilder;
 use Illuminate\Database\Eloquent\Model;
-
-class ProductCategory extends Model
+use App\Models\AdminModel;
+class ProductCategory extends AdminModel
 {
     use CustomModelTree,AdminBuilder;
     protected $table="product_category";

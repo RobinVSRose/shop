@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Admin\Extensions;
+namespace Ejoy\Shop\Extensions;
 
 use App\Models\FormCollection;
 use App\Models\WechatTemplate;

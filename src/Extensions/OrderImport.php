@@ -3,7 +3,7 @@
  * Created by robin@2019/8/30 16:06
  */
 
-namespace App\Admin\Extensions;
+namespace Ejoy\Shop\Extensions;
 
 
 use App\Models\ExpressConfig;

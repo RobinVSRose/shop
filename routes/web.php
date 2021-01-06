@@ -8,8 +8,13 @@ use Illuminate\Routing\Router;
 
 Route::group([
     'prefix'=>'admin',
+    'middleware'    => config('admin.route.middleware'),
     'namespace'     => 'Ejoy\Shop\Controllers\Admin',
 ], function (Router $router) {
+    $router->any('order/import', 'OrderController@import')->name('order_import'); //导入订单
+    $router->any('order/express_import', 'OrderController@express_import')->name('express_import'); //导入物流信息
+    $router->get('order/express/download_demo', 'OrderController@download_express_demo')->name('download_express_demo');
+
     $router->resource('product_category', 'ProductCategoryController');
     $router->resource('product', 'ProductController');
     $router->resource('page', 'PageController');
@@ -25,7 +30,7 @@ Route::group([
         $router->any('product/list', 'ProductController@productList');
         $router->any('category/list', 'ProductController@categoryList');
         $router->any('product/detail', 'ProductController@productDetail');//产品详情
-        $router->middleware(['user_middleware'])->group(function (Router $router) {//必须进行用户注册绑定的路由
+        $router->middleware(['user'])->group(function (Router $router) {//必须进行用户注册绑定的路由
             Route::any('user/cart/list', 'CartController@cartList');//购物车-产品列表
             Route::any('user/cart/update', 'CartController@updateCart');//更新购物车
             Route::any('user/cart/add', 'CartController@addCart');//添加购物车

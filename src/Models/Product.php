@@ -2,12 +2,16 @@
 
 namespace Ejoy\Shop\Models;
 
+use Encore\Admin\Traits\DefaultDatetimeFormat;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Input;
+use App\Models\AdminModel;
+use Illuminate\Support\Facades\Storage;
 
-class Product extends Model
+class Product extends AdminModel
 {
+    use DefaultDatetimeFormat;
     protected $table = "product";
 
     public function attr(){
@@ -59,7 +63,7 @@ class Product extends Model
     public static function getFirstThumb($thumbArr=[]){
         foreach($thumbArr as $thumb){
             if(strpos($thumb,".mp4")===false){
-                return OSS_PIC_URL."/".$thumb;break;
+                return Storage::url($thumb);break;
             }
         }
     }
@@ -92,15 +96,13 @@ class Product extends Model
         if(is_array($product['thumb'])){
             foreach ($product['thumb'] as $k=>&$v){
                 $fileType=strpos($v,".mp4")===false?"image":"video";
-                $v=OSS_PIC_URL."/".$v;
+                $v=Storage::url($v);
                 $product['thumb_list'][]=['url'=>$v,'type'=>$fileType];
                 if(empty($product['first_thumb']) && $fileType=="image")//产品首个封面图
                     $product['first_thumb']=$v;
             }
         }
         $product['thumb_list']=array_values($product['thumb_list']);
-        if(!empty($product['jump_mini_text']))
-            $product['jump_mini_text']=OSS_PIC_URL."/".$product['jump_mini_text'];
     }
     public static function updateCartAndStorage($member_id,$productIdArr){
         $cartList=Cart::where('member_id',$member_id)->whereIn('attr_id',array_keys($productIdArr))->get();

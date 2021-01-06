@@ -2,14 +2,14 @@
 
 namespace Ejoy\Shop\Controllers\Admin;
 
-use App\Admin\Extensions\OrderStatusCancelAction;
-use App\Admin\Extensions\OrderStatusRefundAction;
-use App\Admin\Extensions\OrderStatusReturnAction;
-use App\Admin\Extensions\OrderStatusSendAction;
-use App\Admin\Extensions\Exporter\OrderExcelDemo;
-use App\Admin\Extensions\OrderExcelExporter;
+use Ejoy\Shop\Extensions\OrderExcelExporter;
+use Ejoy\Shop\Extensions\OrderStatusCancelAction;
+use Ejoy\Shop\Extensions\OrderStatusRefundAction;
+use Ejoy\Shop\Extensions\OrderStatusReturnAction;
+use Ejoy\Shop\Extensions\OrderStatusSendAction;
+use Ejoy\Shop\Extensions\OrderExcelDemo;
 use App\Admin\Extensions\CustomBetween;
-use App\Admin\Extensions\OrderImport;
+use Ejoy\Shop\Extensions\OrderImport;
 use App\Facades\Logger;
 use Ejoy\Shop\Models\Order;
 use App\Http\Controllers\Controller;
@@ -94,11 +94,10 @@ class OrderController extends Controller
             if(!Admin::user()->isAdministrator()){
                 $grid->model()->where('channel',Admin::user()->channel);
             }
-            $grid->exporter(new OrderExcelExporter);
             $grid->disableCreateButton();
-            $grid->model()->orderByDesc('order_no');
+            $grid->model()->orderByDesc('id');
             $grid->tools(function($tools){
-                $url=url('order/import',request()->all());
+                $url=route('order_import',request()->all());
                 $tools->append("<a href='$url'  class='btn btn-sm btn-twitter pull-right' style='margin-right:10px;background-color:#1e94af;'><i class='fa fa-upload'></i>批量发货</a>");
             });
 
@@ -126,6 +125,8 @@ class OrderController extends Controller
                         $actions->add(new OrderStatusReturnAction);break;
                 }
             });
+            $grid->exporter(new OrderExcelExporter);
+
             $grid->column('id','订单ID')->sortable();
             if(Admin::user()->isAdministrator()){
                 $grid->column('channel','渠道标识');
@@ -163,7 +164,7 @@ class OrderController extends Controller
             $form->display('updated_at', '更新时间');
             $form->select('status', '状态')->options(Order::$statusArr)->readOnly();
             $form->html(function() use ($orderInfo){
-                return view('admin.form.order.order_product_list',['products'=>$orderInfo->product_list]);
+                return view('shop::order_product_list',['products'=>$orderInfo->product_list]);
             },'订单商品');
             $form->divider('发票信息');
             $form->display('invoice_title', '抬头');

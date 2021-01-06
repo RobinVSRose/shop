@@ -20,13 +20,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Ejoy\\Shop\\": "src/"
+            "Ejoy\\Reservation\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Ejoy\\Shop\\ShopServiceProvider"
+                "Ejoy\\Reservation\\ReservationServiceProvider"
             ]
         }
     }

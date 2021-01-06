@@ -4,12 +4,13 @@ namespace Ejoy\Shop\Models;
 
 use App\Facades\Log;
 use App\Facades\Logger;
+use App\Models\AdminModel;
 use App\Models\User;
 use EasyWeChat\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
-class Order extends Model
+class Order extends AdminModel
 {
     public static $statusArr=['0'=>'删除','1'=>'未付款','2'=>'已付款','3'=>'已发货','4'=>'已取消','5'=>'已收货','6'=>'已退货','7'=>'已退款'];
     protected $table="order";

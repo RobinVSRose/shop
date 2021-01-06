@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Admin\Extensions;
+namespace Ejoy\Shop\Extensions;
 
 use Encore\Admin\Actions\RowAction;
 use Illuminate\Database\Eloquent\Model;
