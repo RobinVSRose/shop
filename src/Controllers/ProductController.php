@@ -7,6 +7,7 @@ use Ejoy\Shop\Models\Product;
 use Ejoy\Shop\Models\ProductCategory;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Storage;
 use Validator;
 use DB;
 class ProductController extends Controller
@@ -16,7 +17,10 @@ class ProductController extends Controller
      */
     public function categoryList(Request $request){
         $channel=$request->get('channel','mini');
-        $categoryArr=ProductCategory::where('status',1)->where('channel',$channel)->get(['id as value','name as label','parent_id'])->toArray();
+        $categoryArr=ProductCategory::where('status',1)->where('channel',$channel)->get(['id as value','name as label','parent_id','thumb'])->toArray();
+        foreach($categoryArr as $c){
+            $c['thumb']=Storage::url($c['thumb']);
+        }
         $arr=self::getTree($categoryArr,'value','parent_id');
         $arr=array_values($arr);
         response_json($arr);
