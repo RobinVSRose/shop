@@ -18,7 +18,7 @@ class ProductController extends Controller
     public function categoryList(Request $request){
         $channel=$request->get('channel','mini');
         $categoryArr=ProductCategory::where('status',1)->where('channel',$channel)->get(['id as value','name as label','parent_id','thumb'])->toArray();
-        foreach($categoryArr as $c){
+        foreach($categoryArr as &$c){
             $c['thumb']=Storage::url($c['thumb']);
         }
         $arr=self::getTree($categoryArr,'value','parent_id');
