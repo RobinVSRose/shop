@@ -63,7 +63,6 @@ class OrderController extends Controller
         if ($validator->fails()) {
             response_json(null, 'VALIDATORERROR', $validator->errors()->first());
         }
-        $orderComment=$request->get('comment','');
         $channel=$request->get('channel','mini');
         $miniConfig=AdminMini::query()->where('channel',$channel)->first()->toArray();
         if(empty($miniConfig))
@@ -105,31 +104,6 @@ class OrderController extends Controller
         }
         $orderModel->comment=!empty($request->comment)?$orderModel->comment."\n".$request->comment:$orderModel->comment;
         //------------------------------微信支付：统一下单&支付参数签名--------------------
-        $wechatPayApp=Factory::payment($miniConfig);
-        $unifyData=[
-            'openid'=>$request->openid,
-            'body'=>'艺崛科技',
-            'attach'=>PRODUCT_ORDER,
-            'out_trade_no'=>$orderModel->order_sn,
-            'total_fee'=>intval($orderModel->total_price*100),
-            'notify_url'=>url('api/order/notify'),
-            'trade_type'=>'JSAPI'
-        ];
-        $return=$wechatPayApp->order->unify($unifyData);//统一下单
-        // return=( [return_code] => SUCCESS [return_msg] => OK [appid] => wx6bc6a5c73e979ffd [mch_id] => 1401801902 [nonce_str] => N3qWWipL3jqV4Rj2 [sign] => 5773EF09149A877FF715E0B364C0CB67 [result_code] => SUCCESS [prepay_id] => wx21171004238680edbdbfee041826545000 [trade_type] => JSAPI )
-        if(empty($return['prepay_id'])){
-            Log::error('统一下单接口数据异常：',$return,'wechat_pay');
-            response_json($return,'FAIL','提交订单-失败');
-        }
-        $orderModel->prepay_id=$return['prepay_id'];
-        for($i=0;$i<3;$i++){
-            FormCollection::saveFormId($return['prepay_id']);
-        }
-        $signData=$wechatPayApp->jssdk->bridgeConfig($return['prepay_id'],false);//支付参数签名
-        if(empty($signData['package'])){
-            Log::error('支付参数-签名错误：',$return,'wechat_pay');
-            response_json($return,'FAIL','支付参数-签名失败');
-        }
         //---------------------------------微信支付：结束----------------------------
         DB::beginTransaction();
         $flag=true;
@@ -146,7 +120,7 @@ class OrderController extends Controller
         if($flag){
             DB::commit();
 
-            response_json(['orderInfo'=>$orderModel->toArray(),'payInfo'=>$signData]);
+            response_json(['orderInfo'=>$orderModel->toArray()]);
         }else{
             DB::rollback();
             response_json(null,'FAIL','订单提交失败');

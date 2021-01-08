@@ -115,7 +115,8 @@ class OrderController extends Controller
                 $actions->disableView();
                 switch ($actions->row->status){
                     case ORDER_COMMITED:
-                        $actions->add(new OrderStatusCancelAction);break;
+                        $actions->add(new OrderStatusCancelAction);
+                        $actions->add(new OrderStatusSendAction);break;
                     case ORDER_PAIED:
                         $actions->add(new OrderStatusRefundAction);
                         $actions->add(new OrderStatusSendAction);break;
